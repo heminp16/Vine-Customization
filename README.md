@@ -5,9 +5,9 @@ A web-based "spreadsheet" designed to enhance the Amazon Vine review process, al
 # Table of Contents
 - [Extract Review Details](#extract-review-details)
     - [Demo of Extract Review Details](#demo-of-extract-review-details)
-- [Amazon Review Autofill - Manual/Automatic](#amazon-review-autofill)
+- [Amazon Review Autofill - Manual/Automatic](#amazon-review-autofill---manualautomatic)
   - [Demo of Amazon Review Autofill](#demo-of-amazon-review-autofill)
-- [Installation](#installation)
+- [Installation](#installation-guide)
 - [Feedback](#feedback)
 
 # Extract Review Details
