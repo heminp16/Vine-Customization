@@ -1,5 +1,5 @@
 
-# Enhance Vine Reviews
+# VineCapture: Web Spreadsheet & Autofiller
 A web-based "spreadsheet" designed to enhance the Amazon Vine review process, along with an autofill script to streamline and improve the reviewing experience. Please read the disclaimer before installation.
 
 # Table of Contents
