@@ -1,24 +1,27 @@
-
 # VineCapture: Web Spreadsheet & Autofiller
 A web-based "spreadsheet" designed to enhance the Amazon Vine review process, along with an autofill script to streamline and improve the reviewing experience. Please read the disclaimer before installation.
 
 # Table of Contents
 - [Extract Review Details](#extract-review-details)
-    - [Demo of Extract Review Details](#demo-of-extract-review-details)
+  - [Disclaimer - Extraction](#disclaimer---extraction)
+  - [Write-Up - Extraction](#write-up---extraction)
+  - [Demo of Extract Review Details](#demo-of-extract-review-details)
 - [Amazon Review Autofill - Manual/Automatic](#amazon-review-autofill---manualautomatic)
+  - [Disclaimer - Autofill](#disclaimer---autofill)
+  - [Write-Up - Autofill](#write-up---autofill)
   - [Demo of Amazon Review Autofill](#demo-of-amazon-review-autofill)
 - [Installation](#installation-guide)
 - [Feedback](#feedback)
 
 # Extract Review Details
 
-## Disclaimer:
+## Disclaimer - Extraction:
 This "Extract Review Details" userscript automates the collection of data from Amazon Vine review pages, a process akin to web scraping. Unlike traditional web scraping, which often involves server-side data extraction for bulk analysis or commercial use, this script operates solely within the user's browser, modifying the viewed webpage content without transmitting data externally or impacting Amazon's servers.
 
 Despite its local operation, please be advised that the utilization of this script is solely at your discretion and risk. I do not assume any responsibility for potential actions taken by Amazon against the user utilizing this script. Furthermore, it is important to note that this script is the product of an independent developer and does not have any official affiliation with Amazon or the Amazon Vine program.
 
 ---
-## Write-Up
+## Write-Up - Extraction
 This script is designed to make managing Amazon Vine reviews easier and more efficient. It automates the extraction of review details directly within the browser, allowing for a spreadsheet-like management without the spreadsheet. 
 
 Features include:
@@ -35,13 +38,13 @@ Features include:
 
 # Amazon Review Autofill - Manual/Automatic
 
-## Disclaimer:
+## Disclaimer - Autofill:
 Using automated scripts on Amazon's website may violate their terms of service, potentially leading to actions against your account. It is recommended to manually select star ratings when possible to minimize risks. I do not assume any responsibility for potential actions taken by Amazon against the user utilizing this script.
 
 This script simplifies the review-writing process by autofilling the review form on Amazon with previously stored data or manual input. It is designed to work along with the "Extract Review Details" script but also supports standalone use.
 
 ---
-## Write-Up
+## Write-Up - Autofill
 This script simplifies the review-writing process by autofilling the review form on Amazon with previously stored data or manual input. It is designed to work along with the "Extract Review Details" script but also supports standalone use.
 
 Features include:
