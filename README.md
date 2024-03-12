@@ -30,7 +30,7 @@ Features include:
   **Note**: Please be aware that if you switch between two computers, the stored data will not synchronize across both devices.
 
 ## Demo of Extract Review Details
-blah
+![demo_of_extract_review_details](https://github.com/heminp16/Vine-Customization/assets/88010681/af35eace-57d2-4e75-b2d3-4f72033999f5)
 
 
 # Amazon Review Autofill - Manual/Automatic
@@ -51,7 +51,8 @@ Features include:
 - **Randomized Click Intervals**: Includes a feature to click star ratings at random intervals between 500ms and 1000ms, aiming to mimic human behavior and reduce detection risk by automated systems.
 
 ## Demo of Amazon Review Autofill
-blah 
+![demo_of_amazon_review_autofill](https://github.com/heminp16/Vine-Customization/assets/88010681/3c6ded91-5abe-4f6b-884f-3d1327ff83b2)
+ 
 
 # Installation Guide
 ### Step 1: Install a Userscript Manager
