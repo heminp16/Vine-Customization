@@ -72,10 +72,10 @@ To use the scripts, you first need to install a userscript manager extension in 
 After installing Tampermonkey or a similar userscript manager, you can install the scripts designed to enhance the Amazon Vine review process. You can choose to install both scripts or just one, depending on your needs.
 
 - **Extract Review Details Script**: Automates the extraction of review details for easier management.
-  - [Install Extract Review Details Script](https://github.com/heminp16/Vine-Customization/raw/main/extract-review-details.user.js)
+  - [Install Extract Review Details Script](https://github.com/heminp16/VineCapture/raw/main/extract-review-details.user.js)
 
 - **Autofill Script**: Simplifies the review-writing process by autofilling review forms on Amazon.
-  - [Install Autofill Script](https://github.com/heminp16/Vine-Customization/raw/main/review-autofill.user.js)
+  - [Install Autofill Script](https://github.com/heminp16/VineCapture/raw/main/review-autofill.user.js)
 
 Click on the links above to install the scripts. Tampermonkey will open a new tab showing the script's content and an "Install" button. Click "Install" to add the script to your browser.
 
