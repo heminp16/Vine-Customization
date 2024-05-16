@@ -1,18 +1,8 @@
-/* ================================ Important Disclaimer: Use of automated scripts * ================================
- *    Use of automated scripts for interactions with Amazon's website may potentially violate their terms of service.
- *    The inclusion of randomized click intervals is intended to simulate more natural user activity, but it is not foolproof.
- *    I do not assume any responsibility for potential actions taken by Amazon against the user utilizing this script.
- *
- *    As a safer alternative, the script is designed to function without the necessity for automated clicking.
- *    Users have the option to manually select the star rating after autofilling the title and body text, ensuring
- *    compliance with Amazon's guidelines.
- * ================================ Important Disclaimer: Use of automated scripts * ================================ */
-
 // ==UserScript==
-// @name         Amazon Review Autofill - Manual/Automatic
+// @name         (New) Amazon Review Autofill - Simulated Typing
 // @namespace    http://tampermonkey.net/
-// @version      1.0
-// @description  Autofill Amazon review text area based on ASIN and review data from local storage (Need "Extract Review Data" script installed), and with manual entry option.
+// @version      1.2
+// @description  Automatically fills Amazon review text areas using ASIN and review data stored in local storage (requires "Extract Review Data" script installed). This script automates the entire process for a seamless experience.
 // @author       skyline
 // @match        *://www.amazon.com/review/create-review?*
 // @match        *://www.amazon.ca/review/create-review?*
@@ -24,25 +14,32 @@
 // ==/UserScript==
 
 /* ===================================================================================================
- *                                 Amazon Review Autofill Script
+ *                          (New) Amazon Review Autofill - Simulated Typing                             
  * ===================================================================================================
  *                       This userscript automates the process of filling out reviews
  *              based on review data stored in the browser's local storage (from my other script).
  *
- * =============================== Key functionalities include: * ====================================
- * 1. Handling Review Titles: If the 'reviewTitle' from the review data does not include a leading
- *    rating (ex: "5;Great Product"), the script treats the entire 'reviewTitle' as the title text.
- *    Also, it will not attempt to click any star rating since none is present.
+ * =============================== Key functionalities include: =====================================
+ * 1. (New) Simulated Typing: To further mimic human behavior, the script simulates typing for the review
+ *    title and body fields with randomized typing speeds and delays. 
+ *    Note: This simulation may be considered bot activity, which is unlikely but possible.
+ * 
+ * 2. Handling Review Titles: If the 'reviewTitle' from the review data lacks a leading rating
+ *    (e.g., "5;Great Product"), the script will skip setting a star rating and treat the 
+ *    'reviewTitle' as the title text without attempting to click any star rating.
  *
- * 2. Autofilling Review Fields: Automatically populates the review title and body fields with the
- *    data retrieved from local storage. If a rating is written (preceding the title in 'reviewTitle'),
+ * 3. Autofilling Review Fields: Automatically populates the review title and body fields with the
+ *    data retrieved from local storage. If a rating is included (preceding the title in 'reviewTitle'),
  *    it will also set the corresponding star rating.
- *
- *    *** PLEASE REFER TO DISCLAIMER FOR THE FOLLOWING ***
- * 3. Randomized Click Intervals for Ratings: To more closely mimic human behavior and reduce the
+ * 
+ * 4. Manual Input Option: Offers an input box for manual entry in the format "Title;Body" or 
+ *    "Rating;Title;Body", which will autofill the review fields upon submission. 
+ *    Note: Although this method allows manual entry, it still simulates typing behavior. For a fully 
+ *    manual process, please refer to my previous deprecated script, deprecated-review-autofill.user.js.
+ * 
+ * 5. Randomized Click Intervals for Ratings: To more closely mimic human behavior and reduce the
  *    likelihood of detection by automated systems, clicks on star ratings are executed with random
  *    delays ranging between 500ms and 1000ms.
- *    *** PLEASE REFER TO DISCLAIMER FOR THE FOLLOWING ***
  * =================================================================================================== */
 
 (function() {
@@ -82,7 +79,7 @@
             const inputBox = document.createElement('input');
             inputBox.type = 'text';
             inputBox.id = 'tm-autofill-input';
-            inputBox.placeholder = 'Enter in the format: Title;Body or Rating;Title;Body';
+            inputBox.placeholder = 'Enter in the format: Title;Body or Rating;Title;Body then press Enter.';
             inputBox.style.flexGrow = '1';
             inputBox.style.height = '40px';
             inputBox.style.marginRight = '15px';
@@ -158,34 +155,76 @@
             });
         }
     }
-    function autofillReview(rating, title, body) {
+
+    /*
+    - New function to populate the Review Title and Body.
+    - The previous script made it appear as if the content was written, but upon submission, errors would arise.
+    - This new portion could be considered "bot activity." To avoid this, please use the previous script:
+        - The previous script would not be deemed "bot activity" as it requires the user to manually click into the Review Title and Body and enter a space for it to recognize the contents.
+    */
+
+    // Define a delay function that returns a promise resolving after a given number of milliseconds
+    function delay(duration) {
+        return new Promise(resolve => setTimeout(resolve, duration));
+    }
+
+    async function simulateTypingForReact(element, text, charsPerBurst = 1) {
+        const isTextArea = element.tagName.toLowerCase() === 'textarea';
+        const valueSetter = Object.getOwnPropertyDescriptor(isTextArea ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype, 'value').set;
+
+        let i = 0;
+        while (i < text.length) {
+            const burst = text.substring(i, i + charsPerBurst);
+            valueSetter.call(element, element.value + burst); // Directly use the value setter here
+
+            // Trigger React's onChange
+            const event = new Event('input', { bubbles: true, cancelable: true });
+            element.dispatchEvent(event);
+
+            await delay(20 + Math.random() * 80); // Delay between 20ms and 100ms per character burst
+            i += charsPerBurst;
+        }
+        element.dispatchEvent(new Event('change', { bubbles: true })); // Trigger change event after finishing typing
+    }
+
+    // Changed function logic - simulates typing
+    async function autofillReview(rating, title, body) {
         // Set the title
         const titleInput = document.getElementById('scarface-review-title-label');
         if (titleInput) {
-            titleInput.value = title;
+            titleInput.focus(); // Simulate focus before typing
+            await simulateTypingForReact(titleInput, title);
+            titleInput.blur(); // Simulate blur after typing
         }
+
         // Set the body
         const bodyTextArea = document.getElementById('scarface-review-text-card-title');
         if (bodyTextArea) {
-            bodyTextArea.value = body + "\n";
+            bodyTextArea.focus(); // Simulate focus before typing
+            await delay(500 + Math.random() * 500); // Shorter initial delay
+            await simulateTypingForReact(bodyTextArea, body, 5); // Type in bursts of 5 characters
+            bodyTextArea.blur(); // Simulate blur after typing
         }
         // Only attempt to set the star rating if a rating is given
         if (rating) {
             const starRatingButtons = document.querySelectorAll('.ryp__star__button');
             const ratingIndex = parseInt(rating, 10) - 1;
             if (!isNaN(ratingIndex) && starRatingButtons && starRatingButtons.length > ratingIndex) {
-
-                // Calculate the delay
-                const delay = Math.random() * (1000 - 500) + 500; // Delay between 500ms and 1000ms
-                // log to console. -- can comment out if wanted
-                console.log(`Setting star rating with a delay of ${delay} milliseconds.`);
-            
                 // Delay to simulate human interaction
-                setTimeout(() => starRatingButtons[ratingIndex].click(), delay);
+                setTimeout(() => starRatingButtons[ratingIndex].click(), Math.random() * (1000 - 500) + 500);
             }
         }
     }
-    window.addEventListener('load', function() {
-        insertInputBoxAndButton();
-    });
+    // Try to add the input box immediately if the element exists, else wait for DOMContentLoaded.
+    // This checks if the page is still loading or fully loaded.
+    function whenDocumentReady(callback) {
+        const interval = setInterval(function() {
+            if (document.readyState === 'complete') {
+                clearInterval(interval);
+                callback();
+            }
+        }, 100);
+    }
+    // Call the function when the document is fully ready.
+    whenDocumentReady(insertInputBoxAndButton);
 })();
