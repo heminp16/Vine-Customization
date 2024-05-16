@@ -1,17 +1,7 @@
-/* ================================ Important Disclaimer: Use of utilizing scripts * ================================
- *    This "Extract Review Details" userscript automates the collection of data from Amazon Vine review pages, a process akin to web scraping. 
- *    Unlike traditional web scraping, which often involves server-side data extraction for bulk analysis or commercial use, this script 
- *    operates solely within the user's browser, modifying the viewed webpage content without transmitting data externally or impacting Amazon's servers.
- *    
- *    Despite its local operation, please be advised that the utilization of this script is solely at your discretion and risk. I do not assume 
- *    any responsibility for potential actions taken by Amazon against the user utilizing this script. Furthermore, it is important to note that 
- *    this script is the product of an independent developer and does not have any official affiliation with Amazon or the Amazon Vine program.
- * ================================ Important Disclaimer: Use of utilizing scripts * ================================ */
-
 // ==UserScript==
 // @name         Extract Review Details
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      1.3
 // @description  Enhances the Amazon Vine review process by automatically creating a web-based "spreadsheet" that organizes and extracts Vine orders, reviews, and related details. 
 // @author       skyline
 // @match        https://www.amazon.com/vine/vine-reviews*
@@ -19,12 +9,13 @@
 // @match        https://www.amazon.co.uk/vine/vine-reviews*
 // @match        https://www.amazon.com/vine/vine-reviews?review-type=pending_review
 // @match        https://www.amazon.com/vine/vine-reviews?review-type=completed
+// @match        https://www.amazon.com/gp/customer-reviews/*
+// @match        https://www.amazon.ca/gp/customer-reviews/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=amazon.com
 // @updateURL    https://github.com/heminp16/Vine-Customization/raw/main/extract-review-details.user.js
 // @downloadURL  https://github.com/heminp16/Vine-Customization/raw/main/extract-review-details.user.js
 // @grant        none
 // ==/UserScript==
-
 
 (function() {
     'use strict';
@@ -106,6 +97,126 @@
         extractButton.onclick = extractAndSendData;
     }
 
+    // Function to create Filtering / Sorting on Data Window Columns
+    function setupFilteringSorting(dataWindow) {
+        let currentFilter = {}; // Tracks the current filters applied to columns
+
+        dataWindow.document.addEventListener('click', function(event) {
+            // If clicking outside the dropdown, close it
+            if (!event.target.classList.contains('filter-button') && !event.target.classList.contains('dynamic-filter-dropdown')) {
+                removeExistingDropdown(dataWindow);
+            }
+        });
+
+        // Sorting Logic
+        dataWindow.document.querySelectorAll('.sort-icon').forEach(function(icon) {
+            icon.addEventListener('click', function() {
+                const th = this.parentNode; // Getting the parent <th> of the sort icon
+                const table = th.closest('table');
+                const tbody = table.querySelector('tbody');
+                const index = Array.from(th.parentNode.children).indexOf(th);
+                const asc = th.classList.toggle('asc', !th.classList.contains('asc')); // Toggle ascending sorting
+
+                Array.from(tbody.querySelectorAll('tr'))
+                    .sort((a, b) => {
+                    // Using a modified comparer function to handle different types of data (text, numbers, dates)
+                    const getCellValue = (tr, idx) => tr.children[idx].innerText || tr.children[idx].textContent;
+                    const comparer = (idx, asc, a, b) => {
+                        let aValue = getCellValue(a, idx);
+                        let bValue = getCellValue(b, idx);
+
+                        // Check if values are date strings in a specific format e.g., MM/DD/YYYY
+                        if (idx === 1) { // date column
+                            const parseDate = str => {
+                                const parts = str.split('/');
+                                return new Date(parts[2], parts[0] - 1, parts[1]);
+                            };
+                            aValue = parseDate(aValue);
+                            bValue = parseDate(bValue);
+                            return asc ? aValue - bValue : bValue - aValue;
+                        }
+
+                        // For text and number columns
+                        return asc ?
+                            isNaN(aValue) || isNaN(bValue) ? aValue.localeCompare(bValue) : aValue - bValue :
+                        isNaN(aValue) || isNaN(bValue) ? bValue.localeCompare(aValue) : bValue - aValue;
+                    };
+                    return comparer(index, asc, a, b);
+                })
+                    .forEach(tr => tbody.appendChild(tr));
+            });
+        });
+
+        // Filtering Logic
+        dataWindow.document.querySelectorAll('.filter-button').forEach(function(button) {
+            button.addEventListener('click', function(event) {
+                event.stopPropagation(); // Prevent event bubbling to the sort functionality
+                var column = this.getAttribute('data-column');
+                // If the filter is already applied, clicking the button again will reset it
+                if (currentFilter[column]) {
+                    currentFilter[column] = false;
+                    filterTable(dataWindow, column, 'All');
+                    removeExistingDropdown(dataWindow);
+                } else {
+                    currentFilter[column] = true; // Set the filter as applied
+                    createAndShowFilterDropdown(dataWindow, button, column);
+                }
+            });
+        });
+        function createAndShowFilterDropdown(dataWindow, filterButton, column) {
+            removeExistingDropdown(dataWindow); // Remove any existing dropdown
+            // Create the dropdown element
+            var dropdown = dataWindow.document.createElement('select');
+            dropdown.className = 'dynamic-filter-dropdown';
+            dropdown.setAttribute('data-column', column);
+            // Populate dropdown with unique values from the column
+            var values = new Set(['All']);
+            dataWindow.document.querySelectorAll('#dataTable tbody tr td[data-column="' + column + '"]').forEach(function(td) {
+                values.add(td.innerText.trim());
+            });
+            // Create and append options to dropdown
+            values.forEach(function(value) {
+                var option = dataWindow.document.createElement('option');
+                option.value = value;
+                option.innerText = value;
+                dropdown.appendChild(option);
+            });
+            // Setup change event to filter table rows
+            dropdown.addEventListener('change', function() {
+                filterTable(dataWindow, column, this.value);
+            });
+            // Append dropdown to body and position it
+            dataWindow.document.body.appendChild(dropdown);
+            positionDropdownBelowButton(dataWindow, dropdown, filterButton);
+        }
+        function removeExistingDropdown(dataWindow) {
+            var existingDropdown = dataWindow.document.querySelector('.dynamic-filter-dropdown');
+            if (existingDropdown) {
+                existingDropdown.remove();
+            }
+        }
+        function positionDropdownBelowButton(dataWindow, dropdown, filterButton) {
+            var buttonRect = filterButton.getBoundingClientRect();
+            dropdown.style.position = 'absolute';
+            dropdown.style.left = buttonRect.left + 'px';
+            dropdown.style.top = (buttonRect.top + buttonRect.height) + 'px';
+            dropdown.style.zIndex = 1000;
+        }
+        function filterTable(dataWindow, column, value) {
+            var rows = dataWindow.document.querySelectorAll('#dataTable tbody tr');
+            rows.forEach(function(row) {
+                var cellValue = row.querySelector('td[data-column="' + column + '"]').innerText.trim();
+                if (value === 'All') {
+                    row.style.display = '';
+                } else if (cellValue === value) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+    }
+
     // Function to create the data window with a copy button and sorting feature
     function createDataWindow(dataHtml, userName) {
         const dataWindow = window.open('', 'dataWindow');
@@ -145,21 +256,47 @@
                             word-wrap: break-word; /* ensure content wraps */
                         }
                         th {
+                            position: relative;
                             background-color: #4CAF50;
                             color: white;
                             cursor: pointer;
                             align-items: center;
                             text-align: center;
                             justify-content: space-between;
-                            position: relative;
                             padding-right: 20px;
+                            white-space: nowrap;
+                            padding: 8px;
                         }
-                        th.sort-icon:after {
-                            content: " \\2195";
-                            position: absolute;
-                            right: 5px; /* position the icon to the right */
-                            top: 50%; /* center vertically */
+                        .sort-icon, .filter-button {
+                            position: relative;
+                            top: 50%;
                             transform: translateY(-50%);
+                        }
+                        .sort-icon {
+                            left: 0;
+                        }
+                        .filter-button {
+                            right: 0;
+                        }
+                        .delete-button {
+                            background-color: transparent;
+                            border: none;
+                            padding: 0;
+                            cursor: pointer;
+                            display: none;
+                        }
+                        .delete-button svg path.overlay {
+                            fill: none;
+                            pointer-events: none;
+                        }
+                        .delete-button:hover svg path.overlay {
+                            fill: darkred; /* change color on hover */
+                        }
+                        td.product-name-cell {
+                            position: relative;
+                        }
+                        tr:hover .delete-button {
+                            display: inline-block; /* show on row hover */
                         }
                         tr:nth-child(even){ background-color: #f2f2f2; }
                         tr:hover { background-color: #ddd; }
@@ -178,14 +315,46 @@
                         <table id="dataTable">
                             <thead>
                                 <tr>
-                                    <th class="sort-icon">Product Name</th>
-                                    <th class="sort-icon">Order Date</th>
-                                    <th class="sort-icon">Review Status</th>
-                                    <th class="sort-icon">Edit Review Link</th>
-                                    <th class="sort-icon">Review Title</th>
-                                    <th class="sort-icon">Review Body</th>
-                                    <th class="sort-icon">Approved Link</th>
-                                    <th class="sort-icon">Product Link</th>
+                                    <th>
+                                        <span class="filter-button" data-column="productName">🔍</span>
+                                        Product Name
+                                        <span class="sort-icon" data-column="productName">⬍</span>
+                                    </th>
+                                    <th>
+                                        <span class="filter-button" data-column="orderDate">🔍</span>
+                                        Order Date
+                                        <span class="sort-icon" data-column="orderDate">⬍</span>
+                                    </th>
+                                    <th>
+                                        <span class="filter-button" data-column="reviewStatus">🔍</span>
+                                        Review Status
+                                        <span class="sort-icon" data-column="reviewStatus">⬍</span>
+                                    </th>
+                                    <th>
+                                        <span class="filter-button" data-column="editReviewLink">🔍</span>
+                                        Edit Review Link
+                                        <span class="sort-icon" data-column="editReviewLink">⬍</span>
+                                    </th>
+                                    <th>
+                                        <span class="filter-button" data-column="reviewTitle">🔍</span>
+                                        Review Title
+                                        <span class="sort-icon" data-column="reviewTitle">⬍</span>
+                                    </th>
+                                    <th>
+                                        <span class="filter-button" data-column="reviewBody">🔍</span>
+                                        Review Body
+                                        <span class="sort-icon" data-column="reviewBody">⬍</span>
+                                    </th>
+                                    <th>
+                                        <span class="filter-button" data-column="approvedReviewLink">🔍</span>
+                                        Approved Link
+                                        <span class="sort-icon" data-column="approvedReviewLink">⬍</span>
+                                    </th>
+                                    <th>
+                                        <span class="filter-button" data-column="productLink">🔍</span>
+                                        Product Link
+                                        <span class="sort-icon" data-column="productLink">⬍</span>
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>${dataHtml}</tbody>
@@ -193,6 +362,20 @@
                     </div>
                     <script>
                     window.onload = function() {
+                        // Delete Button function - updates local storage if row deleted
+                        // Keeping the review title/body in local storage for now. Undecided on removal.
+                        function updateLocalStorageAfterDelete(rowId) {
+                            let dataHtml = localStorage.getItem('extractedData') || '';
+                            let parser = new DOMParser();
+                            let doc = parser.parseFromString(\`<table>\${dataHtml}</table>\`, 'text/html');
+                            const row = doc.querySelector(\`tr[data-id="\${rowId}"]\`);
+                            if (row) {
+                                row.remove();
+                                dataHtml = doc.querySelector('table tbody').innerHTML;
+                                localStorage.setItem('extractedData', dataHtml);
+                            }
+                        }
+
                         const reviewData = JSON.parse(localStorage.getItem('reviewData')) || {};
                         document.querySelectorAll('#dataTable tr').forEach(row => {
                             const rowId = row.getAttribute('data-id');
@@ -223,7 +406,16 @@
                                 localStorage.setItem('reviewData', JSON.stringify(reviewData));
                             });
                         });
-                        /* New Copy Button logic (copies hyperlinks)
+                        // Delete Button logic -> calls function
+                        document.querySelectorAll('.delete-button').forEach(button => {
+                            button.addEventListener('click', function() {
+                                const row = this.closest('tr');
+                                row.remove();
+                                updateLocalStorageAfterDelete(row.getAttribute('data-id'));
+                            });
+                        });
+
+                        /* Copy Button logic - copies hyperlinks
                          - Creates a spreadsheet HYPERLINK Formula for links -- best approach.
                          - Works for Google Sheets, Apple Numbers, MS Excel (hyperlink might be colored black, but will be clickable)
                          - Should work for LibreOffice (same syntax), but not tested */
@@ -248,46 +440,17 @@
                             document.body.removeChild(el);
                             alert("Data copied to clipboard!");
                         });
-                        // Column Sorting Logic
-                        const getCellValue = (tr, idx) => tr.children[idx].innerText || tr.children[idx].textContent;
-                        const comparer = (idx, asc) => {
-                            // If sorting the "Order Date" column
-                            if (idx === 1) {
-                                return (a, b) => {
-                                    const parseDate = str => {
-                                        const parts = str.split('/'); //
-                                        return new Date(parts[2], parts[0] - 1, parts[1]); // creates a Date object (MM/DD/YYYY format)
-                                    };
-                                    const dateA = parseDate(getCellValue(a, idx));
-                                    const dateB = parseDate(getCellValue(b, idx));
-                                    return (dateA - dateB) * (asc ? 1 : -1);
-                                };
-                            } else {
-                                // logic for other columns
-                                return (a, b) => {
-                                    const v1 = getCellValue(asc ? a : b, idx);
-                                    const v2 = getCellValue(asc ? b : a, idx);
-                                    return v1 !== "" && v2 !== "" && !isNaN(v1) && !isNaN(v2) ? v1 - v2 : v1.toString().localeCompare(v2);
-                                };
-                            }
-                        };
-                        document.querySelectorAll('#dataTable th').forEach(th => {
-                            th.addEventListener('click', function() {
-                                const asc = !this.asc;
-                                this.asc = asc; // Toggle the sort direction
-                                const table = th.closest('table');
-                                const tbody = table.querySelector('tbody');
-                                const index = Array.from(th.parentNode.children).indexOf(th);
-                                Array.from(tbody.querySelectorAll('tr'))
-                                    .sort(comparer(index, asc))
-                                    .forEach(tr => tbody.appendChild(tr));
-                            });
-                        });
-                    };
+                    }
                 </script>
             </body>
         </html>
-    `);
+        `);
+        // Call the setup for filter dropdowns after the window has loaded
+        if (dataWindow.document.readyState === 'complete') {
+            setupFilteringSorting(dataWindow);
+        } else {
+            dataWindow.addEventListener('load', () => setupFilteringSorting(dataWindow));
+        }
         dataWindow.document.close();
     }
 
@@ -342,15 +505,17 @@
         let parser = new DOMParser();
         let doc = parser.parseFromString(`<table>${dataHtml}</table>`, 'text/html'); // Wrap dataHtml in <table> for proper parsing
         const rows = document.querySelectorAll('.vvp-reviews-table--row');
+
         rows.forEach(row => {
             // Setup for both "Pending Reviews" and "Approved Reviews"
             const productLinkElement = row.querySelector('td.vvp-reviews-table--text-col a.a-link-normal');
             const orderDateElement = row.querySelector('td:nth-child(3)');
             const orderDate = orderDateElement ? orderDateElement.textContent.trim() : "Unknown Date";
+            const orderTimestamp = orderDateElement ? orderDateElement.dataset.orderTimestamp : "0"; // Fallback to "0" if no timestamp
             const reviewStatusElement = row.querySelector('td:nth-child(4)');
             let reviewStatus = reviewStatusElement ? reviewStatusElement.textContent.trim() : "Unknown Status";
 
-            /*  New productName Logic 02/15/24:
+            /*  productName Logic - 02/15/24:
                 For some reason, after testing on 2/15/24, there seems to be an error extracting "Product Names"
                 Need to throw an error -> tell user to retry extraction */
             let productNameElement = row.querySelector('td.vvp-reviews-table--text-col .a-truncate-full.a-offscreen');
@@ -415,12 +580,31 @@
             }
 
             // Create a table row HTML for a review, including unique ID, product details, review status, links for editing and viewing the review, and editable fields for review title and body.
-            const rowHtml = `<tr data-id="${uniqueId}"><td>${productName}</td><td>${orderDate}</td><td>${reviewStatus}</td><td>${editReviewLink}</td><td contenteditable="true" class="editable" data-column="reviewTitle">${reviewTitle}</td><td contenteditable="true" class="editable" data-column="reviewBody">${reviewBody || ''}</td><td>${approvedReviewLink}</td><td>${productLink}</td></tr>`;
+            const rowHtml = `
+            <tr data-id="${uniqueId}" data-order-ts="${orderTimestamp}">
+                <td class="product-name-cell" data-column="productName">
+                    <button class="delete-button">
+                        <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="25" height="25" viewBox="0 0 512 512">
+                            <path fill="#E04F5F" d="M504.1,256C504.1,119,393,7.9,256,7.9C119,7.9,7.9,119,7.9,256C7.9,393,119,504.1,256,504.1C393,504.1,504.1,393,504.1,256z"></path>
+                            <path fill="#FFF" d="M285,256l72.5-84.2c7.9-9.2,6.9-23-2.3-31c-9.2-7.9-23-6.9-30.9,2.3L256,222.4l-68.2-79.2c-7.9-9.2-21.8-10.2-31-2.3c-9.2,7.9-10.2,21.8-2.3,31L227,256l-72.5,84.2c-7.9,9.2-6.9,23,2.3,31c4.1,3.6,9.2,5.3,14.3,5.3c6.2,0,12.3-2.6,16.6-7.6l68.2-79.2l68.2,79.2c4.3,5,10.5,7.6,16.6,7.6c5.1,0,10.2-1.7,14.3-5.3c9.2-7.9,10.2-21.8,2.3-31L285,256z"></path>
+                            <path class="overlay" d="M285,256l72.5-84.2c7.9-9.2,6.9-23-2.3-31c-9.2-7.9-23-6.9-30.9,2.3L256,222.4l-68.2-79.2c-7.9-9.2-21.8-10.2-31-2.3c-9.2,7.9-10.2,21.8-2.3,31L227,256l-72.5,84.2c-7.9,9.2-6.9,23,2.3,31c4.1,3.6,9.2,5.3,14.3,5.3c6.2,0,12.3-2.6,16.6-7.6l68.2-79.2l68.2,79.2c4.3,5,10.5,7.6,16.6,7.6c5.1,0,10.2-1.7,14.3-5.3c9.2-7.9,10.2-21.8,2.3-31L285,256z"></path>
+                        </svg>
+                    </button>
+                    ${productName}
+                </td>
+                <td data-column="orderDate">${orderDate}</td>
+                <td data-column="reviewStatus">${reviewStatus}</td>
+                <td data-column="editReviewLink">${editReviewLink}</td>
+                <td contenteditable="true" class="editable" data-column="reviewTitle">${reviewTitle}</td>
+                <td contenteditable="true" class="editable" data-column="reviewBody">${reviewBody || ''}</td>
+                <td data-column="approvedReviewLink">${approvedReviewLink}</td>
+                <td data-column="productLink">${productLink}</td>
+            </tr>`;
 
-            // Update any new information for the data window; basing off uniqueId to avoid duplicates 
+            // Update any new information for the data window; basing off uniqueId to avoid duplicates
             let existingRow = doc.querySelector(`tr[data-id="${uniqueId}"]`);
             if (existingRow) {
-                 // Get current values
+                // Get current values
                 let currentStatus = existingRow.querySelector('td:nth-child(3)').textContent;
                 let currentApprovedLink = existingRow.querySelector('td:nth-child(7)').innerHTML;
 
@@ -433,7 +617,7 @@
                 if (currentApprovedLink !== approvedReviewLink) {
                     existingRow.querySelector('td:nth-child(7)').innerHTML = approvedReviewLink; // Updates the link if missing before
                     approvedDataUpdated= true;
-                }
+                }          
             } else {
                 // If no existing row, append new data
                 let tbody = doc.querySelector('table').querySelector('tbody') || doc.querySelector('table');
@@ -441,6 +625,13 @@
                 isNewProductData = true;
             }
         });
+
+        // Sort the table rows by the 'data-order-ts' attribute after processing all rows
+        const sortedRows = Array.from(doc.querySelectorAll('tr')).sort((a, b) => a.getAttribute('data-order-ts') - b.getAttribute('data-order-ts'));
+        const tbody = doc.querySelector('table').querySelector('tbody') || doc.querySelector('table');
+        tbody.innerHTML = ''; // Clear existing rows
+        sortedRows.forEach(row => tbody.appendChild(row)); // Append sorted rows
+
         dataHtml = doc.querySelector('table tbody').innerHTML;
 
         // Updates local storage if new data is found
@@ -491,5 +682,109 @@
             openedDataWindow.document.close();
         }
     }
-    window.addEventListener('load', insertButtons, false);
+
+    // Faster buttons load
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', insertButtons);
+    } else {
+        insertButtons();
+    }
+
+    // Function to extract Approved Review Body from "www.amazon.com/gp/customer-reviews/*"
+    // Cannot extract from the Vine portal, therefore, added a button to this page to help complete the Web Spreadsheet
+    function extractApprovedReviewBody() {
+        // Function to add button next to "Customer Review"
+        function addExtractReviewBodyButton() {
+            const addButton = () => {
+                const customerReviewHeading = document.getElementById('cr-customer-review');
+
+                if (customerReviewHeading) {
+                    const flexContainer = document.createElement('div');
+                    flexContainer.style.display = 'flex';
+                    flexContainer.style.alignItems = 'center';
+
+                    const button = document.createElement('button');
+                    button.textContent = 'Extract and Save Review Body';
+                    // set button styles
+                    button.style.backgroundColor = '#4CAF50';
+                    button.style.color = 'white';
+                    button.style.padding = '10px 20px';
+                    button.style.marginLeft = '20px';
+                    button.style.border = 'none';
+                    button.style.borderRadius = '5px';
+                    button.style.cursor = 'pointer';
+                    button.style.transition = 'background-color 0.3s ease';
+
+                    button.onclick = extractReviewBodyAndSave;
+                    // set event listeners
+                    button.addEventListener('mouseover', () => {
+                        if (!button.disabled) { // only change color if the button is not disabled
+                            button.style.backgroundColor = '#45a049';
+                        }
+                    });
+                    button.addEventListener('mouseout', () => {
+                        if (!button.disabled) { // revert color only if the button is not disabled
+                            button.style.backgroundColor = '#4CAF50';
+                        }
+                    });
+                    customerReviewHeading.parentNode.insertBefore(flexContainer, customerReviewHeading);
+                    flexContainer.appendChild(customerReviewHeading);
+                    flexContainer.appendChild(button);
+                }
+            };
+            // try to add the button immediately if the element exists, else wait for DOMContentLoaded
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', addButton);
+            } else {
+                addButton();
+            }
+        }
+        // Function to extract the review body and update it in local storage
+        function extractReviewBodyAndSave() {
+            const stateObject = document.getElementById('cr-state-object'); // Extract ASIN from the page
+            let asin = '';
+            if (stateObject && stateObject.dataset.state) {
+                const state = JSON.parse(stateObject.dataset.state);
+                asin = state.asin;
+            }
+            if (!asin) {
+                alert('Error: ASIN not found. Please try refreshing, or may need to manually copy-paste.');
+                return;
+            }
+            // Extract review body text
+            const reviewBodyText = document.querySelector('span[data-hook="review-body"]').textContent.trim();
+            let dataHtml = localStorage.getItem('extractedData') || ''; // get existing data from local storage
+            // Parse the existing HTML to find the correct place to update the review body
+            let parser = new DOMParser();
+            let doc = parser.parseFromString(`<table>${dataHtml}</table>`, 'text/html');
+            console.log(doc)
+
+            // Update row that match the ASIN; ignores the Order Date, not available (but should be fine)
+            const rowsToUpdate = doc.querySelectorAll(`tr[data-id^="review-${asin}-"]`);
+            console.log(rowsToUpdate)
+            let found = false;
+
+            rowsToUpdate.forEach(row => {
+                let reviewBodyCell = row.querySelector('td[data-column="reviewBody"]');
+                if (reviewBodyCell) {
+                    reviewBodyCell.textContent = reviewBodyText; // Update the review body text
+                    found = true;
+                }
+            });
+            if (found) {
+                // Update local storage
+                dataHtml = doc.querySelector('table tbody').innerHTML;
+                localStorage.setItem('extractedData', dataHtml);
+                // Disable the button and show a check mark
+                this.textContent = '✓ Review Body Saved'; // Update button text to include a check mark
+                this.disabled = true; // Disable the button
+                this.style.backgroundColor = '#6da9c9';
+            } else {
+                alert('No matching review entry found for the ASIN in local storage.');
+            }
+        }
+        // Add the button when the script runs
+        addExtractReviewBodyButton();
+    }
+    extractApprovedReviewBody();
 })();
